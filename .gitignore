@@ -1,0 +1,22 @@
+# Archivos objeto
+*.o
+
+# Ejecutables generados
+eafitOS
+editor/editor
+
+# Archivos generados por las pruebas del editor
+editor/tests/demo_file.txt
+editor/tests/demo_output.txt
+editor/tests/expected_demo.txt
+
+# Archivos creados durante pruebas manuales
+integracion.txt
+
+# Archivos temporales del editor
+*~
+*.swp
+
+# Archivos heredados innecesarios del Shell original
+sys_shell2
+algo
