@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <sys/stat.h>
 
 #include "../src/huffman/compresor.h"
@@ -26,9 +27,17 @@ int main(void)
     if (stat(entrada, &info) != 0)
     {
         fprintf(stderr,
-                "No existe el archivo de prueba.\n");
+                "ERROR: archivo de entrada no existe.\n");
         return 1;
     }
+
+    /*
+     * Eliminar solo el resultado de prueba anterior.
+     * Nunca eliminar el archivo original.
+     */
+    remove(salida);
+
+    printf("Iniciando compresion Huffman...\n");
 
     int resultado = huffman_comprimir(
         entrada,
@@ -38,18 +47,22 @@ int main(void)
         NULL
     );
 
-    /*
-     * El compresor aun no escribe los bloques.
-     * Por eso esperamos un retorno -1.
-     */
-    if (resultado != -1)
+    if (resultado != 0)
     {
-        printf("ERROR: resultado inesperado.\n");
+        printf("PRUEBA FALLIDA: compresion.\n");
         return 1;
     }
 
-    printf("Fase de preparacion ejecutada.\n");
-    printf("Compresion completa aun pendiente.\n");
+    if (stat(salida, &info) != 0)
+    {
+        printf("PRUEBA FALLIDA: archivo no generado.\n");
+        return 1;
+    }
 
+    printf("Archivo comprimido generado.\n");
+    printf("Tamano comprimido: %lld bytes\n",
+           (long long)info.st_size);
+
+    printf("PRUEBA SUPERADA.\n");
     return 0;
 }
