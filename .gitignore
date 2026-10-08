@@ -55,3 +55,10 @@ editor/tests/prueba_archivo.*
 editor/tests/test_integridad
 editor/tests/recuperado_*.bin
 editor/tests/salida_*.huff
+# Dependencias generadas por el compilador
+*.d
+
+# Archivos de pruebas de integracion del editor
+editor/prueba_integracion.txt
+editor/prueba_integracion.huff
+editor/prueba_recuperada.txt

@@ -1,26 +1,37 @@
 
 CC = gcc
-CFLAGS = -Wall -Wextra -pedantic -pthread
+
+CFLAGS = -Wall -Wextra -Wpedantic -std=c11 \
+         -D_POSIX_C_SOURCE=200809L -pthread
 
 TARGET = editor
 
-OBJ = src/main.o src/editor.o src/tareas.o
+SRCS = \
+	src/main.c \
+	src/editor.c \
+	src/tareas.c \
+	src/huffman/frecuencias.c \
+	src/huffman/arbol.c \
+	src/huffman/bloque.c \
+	src/huffman/pool.c \
+	src/huffman/archivo.c \
+	src/huffman/compresor.c \
+	src/huffman/descompresor.c
+
+OBJ = $(SRCS:.c=.o)
+DEPS = $(OBJ:.o=.d)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) $(OBJ) -o $(TARGET)
 
-src/main.o: src/main.c src/editor.h src/tareas.h
-	$(CC) $(CFLAGS) -c src/main.c -o src/main.o
+%.o: %.c
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
-src/editor.o: src/editor.c src/editor.h
-	$(CC) $(CFLAGS) -c src/editor.c -o src/editor.o
-
-src/tareas.o: src/tareas.c src/tareas.h
-	$(CC) $(CFLAGS) -c src/tareas.c -o src/tareas.o
+-include $(DEPS)
 
 clean:
-	rm -f $(OBJ) $(TARGET)
+	rm -f $(OBJ) $(DEPS) $(TARGET)
 
 .PHONY: all clean
