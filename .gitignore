@@ -46,3 +46,4 @@ editor/tests/test_frecuencias_grande
 
 # Ejecutable de prueba de pthread
 editor/tests_concurrencia/prueba_hilos
+editor/tests/test_bloque
