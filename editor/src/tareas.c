@@ -5,19 +5,23 @@
 #include "huffman/compresor.h"
 #include "huffman/descompresor.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 /*
- * Callback del compresor Huffman.
- * Protege el progreso compartido con mutex.
+ * Actualiza de manera segura el porcentaje
+ * de avance de una operacion Huffman.
+ *
+ * Puede ser llamado desde un hilo trabajador.
  */
 static void actualizar_progreso(
     int porcentaje,
     void *contexto)
 {
-    Tarea *tarea = contexto;
+    Tarea *tarea = (Tarea *)contexto;
+
+    if (tarea == NULL)
+        return;
 
     if (porcentaje < 0)
         porcentaje = 0;
@@ -33,12 +37,14 @@ static void actualizar_progreso(
 }
 
 /*
- * Trabajador asincrono.
- * Ejecuta la operacion Huffman solicitada.
+ * Hilo principal de la tarea asincrona.
+ *
+ * Ejecuta la compresion o descompresion
+ * sin bloquear la consola del editor.
  */
 static void *ejecutar_tarea(void *arg)
 {
-    Tarea *tarea = arg;
+    Tarea *tarea = (Tarea *)arg;
 
     pthread_mutex_lock(&tarea->mutex);
 
@@ -65,9 +71,11 @@ static void *ejecutar_tarea(void *arg)
     }
     else if (operacion == OPERACION_DESCOMPRIMIR)
     {
-        resultado = huffman_descomprimir(
+        resultado = huffman_descomprimir_con_progreso(
             entrada,
-            salida
+            salida,
+            actualizar_progreso,
+            tarea
         );
     }
 
@@ -92,6 +100,9 @@ static void *ejecutar_tarea(void *arg)
 
 /*
  * Inicializa el administrador de tareas.
+ *
+ * Debe llamarse una sola vez antes
+ * de utilizar la estructura Tarea.
  */
 int tarea_inicializar(Tarea *tarea)
 {
@@ -105,18 +116,23 @@ int tarea_inicializar(Tarea *tarea)
 
     tarea->estado = TAREA_PENDIENTE;
     tarea->operacion = OPERACION_NINGUNA;
+    tarea->progreso = 0;
     tarea->resultado = 0;
+    tarea->hilo_creado = 0;
 
     return 0;
 }
 
 /*
- * Inicia un trabajo nuevo.
- * Solo permite un trabajo activo.
- * Recoge el hilo anterior si ya termino.
+ * Inicia una nueva operacion Huffman.
  *
- * Esta funcion debe llamarse desde el
- * hilo de comandos del editor.
+ * Solo admite una tarea activa a la vez.
+ * Si el trabajo anterior termino, recoge
+ * su hilo antes de crear el siguiente.
+ *
+ * Debe llamarse desde el hilo principal
+ * del editor, no simultaneamente desde
+ * multiples hilos.
  */
 int tarea_iniciar(
     Tarea *tarea,
@@ -126,54 +142,61 @@ int tarea_iniciar(
     int num_hilos)
 {
     if (tarea == NULL ||
-        entrada == NULL || salida == NULL ||
-        entrada[0] == '\0' || salida[0] == '\0')
-        return -1;
-
-    if (operacion != OPERACION_COMPRIMIR &&
-        operacion != OPERACION_DESCOMPRIMIR)
-        return -1;
-
-    if (operacion == OPERACION_COMPRIMIR &&
-        (num_hilos < 1 || num_hilos > 32))
-        return -1;
-
-    pthread_mutex_lock(&tarea->mutex);
-
-    if (tarea->estado == TAREA_EJECUTANDO)
+        entrada == NULL ||
+        salida == NULL ||
+        entrada[0] == '\0' ||
+        salida[0] == '\0')
     {
-        pthread_mutex_unlock(&tarea->mutex);
         return -1;
     }
 
+    if (operacion != OPERACION_COMPRIMIR &&
+        operacion != OPERACION_DESCOMPRIMIR)
+    {
+        return -1;
+    }
+
+    if (operacion == OPERACION_COMPRIMIR &&
+        (num_hilos < 1 || num_hilos > 32))
+    {
+        return -1;
+    }
+
+    pthread_mutex_lock(&tarea->mutex);
+
     /*
-     * PENDIENTE con hilo creado representa
-     * una tarea que aun no ha arrancado.
+     * Rechazar una nueva tarea si
+     * existe otra pendiente o ejecutandose.
      */
     if (tarea->hilo_creado &&
-        tarea->estado == TAREA_PENDIENTE)
+        (tarea->estado == TAREA_PENDIENTE ||
+         tarea->estado == TAREA_EJECUTANDO))
     {
         pthread_mutex_unlock(&tarea->mutex);
         return -1;
     }
 
     int recoger = tarea->hilo_creado;
-    pthread_t anterior = tarea->hilo;
+    pthread_t hilo_anterior = tarea->hilo;
 
     pthread_mutex_unlock(&tarea->mutex);
 
     /*
-     * El hilo anterior ya alcanzo un estado
-     * terminal. No retenemos el mutex en join.
+     * Esperar y recoger el hilo anterior
+     * si ya termino su procesamiento.
      */
     if (recoger)
     {
-        if (pthread_join(anterior, NULL) != 0)
+        if (pthread_join(hilo_anterior, NULL) != 0)
             return -1;
 
         tarea->hilo_creado = 0;
     }
 
+    /*
+     * Copiar las rutas para que sigan
+     * existiendo durante toda la tarea.
+     */
     char *nueva_entrada = strdup(entrada);
     char *nueva_salida = strdup(salida);
 
@@ -192,28 +215,30 @@ int tarea_iniciar(
 
     tarea->entrada = nueva_entrada;
     tarea->salida = nueva_salida;
+
     tarea->operacion = operacion;
     tarea->num_hilos = num_hilos;
+
+    tarea->estado = TAREA_PENDIENTE;
     tarea->progreso = 0;
     tarea->resultado = -1;
-    tarea->estado = TAREA_PENDIENTE;
 
     /*
-     * Creamos el hilo mientras mantenemos
-     * el mutex. El trabajador espera hasta
-     * que terminemos de registrar su estado.
+     * Crear el trabajador mientras
+     * mantenemos el mutex.
+     *
+     * El nuevo hilo esperara hasta
+     * que registremos hilo_creado.
      */
-    int rc = pthread_create(
-        &tarea->hilo,
-        NULL,
-        ejecutar_tarea,
-        tarea
-    );
-
-    if (rc != 0)
+    if (pthread_create(
+            &tarea->hilo,
+            NULL,
+            ejecutar_tarea,
+            tarea) != 0)
     {
         tarea->estado = TAREA_ERROR;
         tarea->hilo_creado = 0;
+
         pthread_mutex_unlock(&tarea->mutex);
         return -1;
     }
@@ -226,7 +251,8 @@ int tarea_iniciar(
 }
 
 /*
- * Consulta segura del estado y progreso.
+ * Consulta el estado y el progreso
+ * utilizando exclusion mutua.
  */
 void tarea_consultar(
     Tarea *tarea,
@@ -236,7 +262,9 @@ void tarea_consultar(
     if (tarea == NULL ||
         estado == NULL ||
         progreso == NULL)
+    {
         return;
+    }
 
     pthread_mutex_lock(&tarea->mutex);
 
@@ -247,9 +275,13 @@ void tarea_consultar(
 }
 
 /*
- * Espera al trabajador y libera memoria.
- * No debe llamarse mientras otro hilo
- * ejecuta tarea_iniciar o tarea_consultar.
+ * Finaliza el administrador.
+ *
+ * Espera al trabajador si sigue activo,
+ * libera memoria y destruye el mutex.
+ *
+ * Debe ejecutarse cuando ningun otro
+ * hilo vaya a acceder a Tarea.
  */
 void tarea_finalizar(Tarea *tarea)
 {

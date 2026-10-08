@@ -2,21 +2,27 @@
 #ifndef HUFFMAN_DESCOMPRESOR_H
 #define HUFFMAN_DESCOMPRESOR_H
 
+typedef void (*HuffmanProgresoDescompresion)(
+    int porcentaje,
+    void *contexto
+);
+
 /*
- * Descomprime un archivo HUF1.
- *
- * entrada: archivo .huff
- * salida: archivo recuperado
- *
- * Devuelve:
- *   0 si termina correctamente
- *  -1 si ocurre un error
- *
- * No sobrescribe archivos existentes.
+ * Descompresion tradicional.
  */
 int huffman_descomprimir(
     const char *entrada,
     const char *salida
+);
+
+/*
+ * Descompresion con progreso.
+ */
+int huffman_descomprimir_con_progreso(
+    const char *entrada,
+    const char *salida,
+    HuffmanProgresoDescompresion progreso,
+    void *contexto
 );
 
 #endif
