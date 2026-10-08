@@ -1,3 +1,8 @@
+
+# ==========================================
+# PARCIAL 1 - SISTEMAS OPERATIVOS
+# ==========================================
+
 # Archivos objeto
 *.o
 
@@ -20,3 +25,24 @@ integracion.txt
 # Archivos heredados innecesarios del Shell original
 sys_shell2
 algo
+
+# ==========================================
+# PARCIAL 2 - CONCURRENCIA Y HUFFMAN
+# ==========================================
+
+# Archivos generados durante pruebas
+editor/prueba_parcial2.txt
+editor/tests/prueba_grande.bin
+editor/tests/prueba_huffman.txt
+
+# Archivos comprimidos de prueba
+editor/tests/*.huff
+
+# Ejecutables de pruebas Huffman
+editor/tests/test_arbol
+editor/tests/test_compresor
+editor/tests/test_frecuencias
+editor/tests/test_frecuencias_grande
+
+# Ejecutable de prueba de pthread
+editor/tests_concurrencia/prueba_hilos
