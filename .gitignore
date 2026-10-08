@@ -49,3 +49,5 @@ editor/tests_concurrencia/prueba_hilos
 editor/tests/test_bloque
 editor/tests/test_pool
 editor/tests/prueba_pool.bin
+editor/tests/test_archivo
+editor/tests/prueba_archivo.*
