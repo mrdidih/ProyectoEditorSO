@@ -51,3 +51,7 @@ editor/tests/test_pool
 editor/tests/prueba_pool.bin
 editor/tests/test_archivo
 editor/tests/prueba_archivo.*
+# Pruebas de integridad Huffman
+editor/tests/test_integridad
+editor/tests/recuperado_*.bin
+editor/tests/salida_*.huff
